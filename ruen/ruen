@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+
+Help(){
+echo "\nHelp is here!"
+echo "-r Input the name of the meta data file, do not include the path"
+echo "-d Add the depth of coverage for a voc to be used, the default argument is 0"
+echo "-q Add the minimum base quality to be used, the default is 0"
+echo "-h display this help message and exit"
+echo "-i Change dpi, default is 1000"
+echo "-f to set the min snv frequency the default is 0.01"
+echo "-s default is True if, this flag will run your job in sbatch. If you would like to disable it enter '-s F'"
+echo "Make sure VCFparser can be run from your environment or is installed so it can be run or else this wont work"
+echo ""
+echo "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo "This script is meant to work on multiple vcfparser files at once. "
+echo "To use it be in the reportables directory e.g. date_reportable and within said directorty the various submitters files. "
+echo "Probably called AB or WIN but it does not matter, come find me (Matthew Wells) if you wish to argue."
+echo "There is a default path set to the reference metadata files, if that ever changes you will need to alter the DATAPATH arg below."
+echo "If you rerun this script on a directory vcfparser has already been ran on, you will have a bad time as it will try to run it on anythin that containst vcfparser.txt."
+echo "However it will still work probably but you may see ALOT of errors."
+echo "I digress though have fun"
+echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+echo ""
+echo "Thank you for using ^^^^ let me know if you want anything else added to it"
+exit 1
+}
+
+
+TEMPHOME=$PWD
+DEPTH=0
+QUALITY=0
+DPI=1000
+FREQ=0.01
+SB_MODE="True"
+
+while getopts ":r:d:q:i:f:s:h" flag
+do
+	case "${flag}" in 
+		r) REF_META=${OPTARG};;
+		d) DEPTH=${OPTARG};;
+		q) QUALITY=${OPTARG};;
+		i) DPI=${OPTARG};;
+		f) FREQ=${OPTARG};;
+		s) SB_MODE=${OPTARG};;
+		h) Help exit;;
+	esac
+done
+
+DATAPATH="/Put/your/path/here/"$REF_META
+
+if [ -z $REF_META ]
+then
+	echo "Missing reference metadata argument"
+	Help
+fi
+
+echo "Metdata file being used is "$REF_META
+echo "Quality parameter passed is "$QUALITY
+echo "Minimum Depth used is "$DEPTH
+echo "DPI used is "$DPI
+echo ""
+
+
+
+for i in $(find . -maxdepth 2 -type f -name "*.txt" | grep -i "vcfparser.txt")
+do
+cd $(dirname $i)
+echo $PWD
+if [ $SB_MODE = "True" ]
+then
+	echo $(sbatch -c 8 --mem 16GB -p NMLResearch -J VCFVIZ --wrap="vcfparser -f $(basename $i) -r $DATAPATH -voc all --subplots_mode oneplotperfile --annotate --min_depth_coverage $DEPTH --min_quality $QUALITY --dpi $DPI --min_snv_freq_threshold $FREQ")
+else
+	echo "vcfparser -f $(basename $i) -r $DATAPATH -voc all --subplots_mode oneplotperfile --annotate --min_depth_coverage $DEPTH --min_quality $QUALITY --dpi $DPI --min_snv_freq_threshold $FREQ"
+	$(vcfparser -f $(basename $i) -r $DATAPATH -voc all --subplots_mode oneplotperfile --annotate --min_depth_coverage $DEPTH --min_quality $QUALITY --dpi $DPI --min_snv_freq_threshold $FREQ)
+fi
+cd $TEMPHOME
+echo ""
+done
+exit
